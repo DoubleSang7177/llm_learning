@@ -30,11 +30,47 @@ messages = [
     }
 ]
 
-def get_btc_price():
-    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+def get_price(symbol):
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
     response = requests.get(url)
     data = response.json()
     return float(data["price"])
+
+def get_symbol(user_input):
+    user_input = user_input.lower()
+
+    # ===== 1️⃣ 中文映射（优先级最高）=====
+    symbol_map = {
+        "比特币": "BTC",
+        "大饼": "BTC",
+        "以太坊": "ETH",
+        "以太": "ETH",
+        "二饼": "ETH",
+        "狗狗币": "DOGE",
+    }
+
+    for k, v in symbol_map.items():
+        if k in user_input:
+            return v + "USDT"
+
+    # ===== 2️⃣ 英文单词匹配（标准用户）=====
+    valid_symbols = ['btc', 'eth', 'sol', 'zec', 'doge']
+
+    words = user_input.split()
+    for word in words:
+        if word in valid_symbols:
+            return word.upper() + "USDT"
+
+    # ===== 3️⃣ 英文字符提取（兜底方案）=====
+    symbol = ""
+    for c in user_input:
+        if c.isascii() and c.isalpha():
+            symbol += c
+
+    if symbol:
+        return symbol.upper() + "USDT"
+
+    return None
 
 def parse_level(level_str):
     if '-' in level_str:
@@ -60,7 +96,8 @@ while True:
 
 
     # 用户输入加入上下文
-    price = get_btc_price()
+    symbol = get_symbol(user_input)
+    price = get_price(symbol)
     print('当前价格： ', price)
     messages.append({"role":"user","content":f"当前比特币价格是{price},{user_input}"})
 

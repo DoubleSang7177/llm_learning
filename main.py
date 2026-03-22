@@ -36,6 +36,21 @@ def get_btc_price():
     data = response.json()
     return float(data["price"])
 
+def parse_level(level_str):
+    if '-' in level_str:
+        low, high = level_str.split('-')
+        low = float(low)
+        high = float(high)
+    else:
+        low = high = float(level_str)
+    return low,high
+
+def do_long():
+    print("做多")
+
+def do_short():
+    print("做空")
+
 while True:
     user_input = input("你：")
 
@@ -45,7 +60,9 @@ while True:
 
 
     # 用户输入加入上下文
-    messages.append({"role":"user","content":user_input})
+    price = get_btc_price()
+    print('当前价格： ', price)
+    messages.append({"role":"user","content":f"当前比特币价格是{price},{user_input}"})
 
     try:
         # 请求ai
@@ -59,17 +76,26 @@ while True:
         # 获取ai回复
         api_reply = response.choices[0].message.content
         data = json.loads(api_reply)
-        price = get_btc_price()
-        print('当前价格： ',price)
-        if data['direction'] == '看多':
+        # print('data: ',data)
+        if '多' in data['direction'] or '涨' in data['direction']:
             print("👉 建议做多")
-            print("支撑位：", data["levels"]["support"])
-            print("压力位：", data["levels"]["resistance"])
+            support_low,support_high = parse_level(data["levels"]["support"])
+            print("支持位置：",support_low,support_high)
+            res_low,res_high = parse_level(data["levels"]["resistance"])
+            print("压力位：", res_low,res_high)
+            if support_low <= price <= support_high*1.01:
+                do_long()
+            print('原因： ',data['reason'])
             print("风险：", data["risk"])
-        elif data['direction'] == '看空':
+        elif '空' in data['direction'] :
             print("👉 建议做空")
-            print("支撑位：", data["levels"]["support"])
-            print("压力位：", data["levels"]["resistance"])
+            support_low, support_high = parse_level(data["levels"]["support"])
+            print("支持位置：", support_low, support_high)
+            res_low, res_high = parse_level(data["levels"]["resistance"])
+            print("压力位：", res_low, res_high)
+            if res_low * -1.01 <= price <= res_high:
+                do_short()
+            print('原因： ', data['reason'])
             print("风险：", data["risk"])
         else:
             print('震荡为主，没有明确方向')

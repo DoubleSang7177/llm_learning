@@ -1,5 +1,5 @@
 import json
-
+import requests
 from openai import OpenAI
 
 client = OpenAI(
@@ -30,6 +30,12 @@ messages = [
     }
 ]
 
+def get_btc_price():
+    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    response = requests.get(url)
+    data = response.json()
+    return float(data["price"])
+
 while True:
     user_input = input("你：")
 
@@ -53,6 +59,8 @@ while True:
         # 获取ai回复
         api_reply = response.choices[0].message.content
         data = json.loads(api_reply)
+        price = get_btc_price()
+        print('当前价格： ',price)
         if data['direction'] == '看多':
             print("👉 建议做多")
             print("支撑位：", data["levels"]["support"])

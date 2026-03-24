@@ -2,37 +2,81 @@ import json
 import requests
 from openai import OpenAI
 import time
+import re
 
 client = OpenAI(
     api_key='sk-8269b69d2ffc4c32aab3dd9dfdcfe2e5',
     base_url='https://api.deepseek.com'
 )
 
+def load_rules():
+    with open('rules.json','r',encoding='utf-8') as f:
+        data = json.load(f)
+    rules_text = ''
+    for r in data['rules']:
+        rules_text += f"{r['condition']} → {r['action']}\n"
+    return rules_text
+
+
+
+rules = load_rules()
 messages = [
     {
         "role": "system",
-        "content": """你是一个专业的加密货币交易员，擅长技术分析和宏观分析。
+        "content": f"""你是一个专业的加密货币交易员。
+        
+你的交易策略如下：
+{rules}
+要求：
+- 你必须严格按照上述交易策略进行分析，
+- 所有结论必须能对应到具体策略，
+- 如果无法匹配任何策略，请输出“观望”。
+
+
+请基于“价格走势”进行分析，而不是单点价格。
+
+分析步骤：
+1. 判断短期趋势（上涨 / 下跌 / 震荡）
+2. 判断当前价格所处位置（高位 / 低位 / 区间）
+3. 给出支撑位和压力位
+4. 最后给出交易方向（看多 / 看空 / 观望）
 
 请用JSON格式输出：
-{
+{{
   "direction": "",
   "reason": [],
-  "levels": {
+  "levels": {{
     "support": "",
     "resistance": ""
-  },
+  }},
   "risk": ""
-}
+}}
 
-不要输出任何解释"""
+要求：
+- 必须基于给定价格走势分析
+- 不要输出任何解释，只输出JSON。如果无法输出JSON，请返回空JSON
+- 不要胡编价格
+- 如果无法判断，请输出观望
+"""
     }
 ]
 
-def get_price(symbol):
+def get_price(symbol, retries=3):
     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-    response = requests.get(url, timeout=5)
-    data = response.json()
-    return float(data["price"])
+
+    for i in range(retries):
+        try:
+            response = requests.get(url, timeout=5)
+            data = response.json()
+
+            return float(data["price"])
+
+        except Exception as e:
+            print(f"获取价格失败，第{i+1}次重试:", e)
+            time.sleep(1)
+
+    # 所有重试都失败
+    return None
 
 
 def get_symbol(user_input):
@@ -69,12 +113,16 @@ def get_symbol(user_input):
 
 
 def parse_level(level_str):
-    if '-' in level_str:
-        low, high = level_str.split('-')
-        return float(low), float(high)
-    else:
-        val = float(level_str)
+    # 提取所有数字（核心！！！）
+    nums = re.findall(r'\d+\.?\d*', level_str)
+
+    if len(nums) >= 2:
+        return float(nums[0]), float(nums[1])
+    elif len(nums) == 1:
+        val = float(nums[0])
         return val, val
+    else:
+        return None, None
 
 
 def do_long():
@@ -86,9 +134,9 @@ def do_short():
 
 
 last_price = None
-
+price_history = []
 while True:
-    user_input = 'btc'   # 你后面可以换 input()
+    user_input = 'btc怎么看'   # 你后面可以换 input()
 
     if user_input.lower() in ['exit', 'quit']:
         print('结束对话')
@@ -96,7 +144,14 @@ while True:
 
     try:
         symbol = get_symbol(user_input)
-        price = get_price(symbol)
+        price = get_price(symbol,3)
+        if price is None:
+            continue
+
+        price_history.append(price)
+        # 限制长度（很重要）
+        if len(price_history) > 200:
+            price_history.pop(0)
 
         print("当前价格：", price)
 
@@ -108,12 +163,12 @@ while True:
         change = abs(price - last_price)
         percent = change/last_price
 
-        if percent > 0.01:
+        if change > 5 and len(price_history) >= 5: # 为了测试方便 实际为percent>0.01
             print("📈 触发AI分析")
 
             messages.append({
                 "role": "user",
-                "content": f"当前价格是{price}，{user_input}"
+                "content": f"最近价格走势是{price_history}，当前价格是{price}，{user_input}"
             })
 
             response = client.chat.completions.create(
@@ -124,7 +179,13 @@ while True:
             )
 
             api_reply = response.choices[0].message.content
-            data = json.loads(api_reply)
+            print('api_reply: ',api_reply)
+            try:
+                api_reply = api_reply.strip('```json').strip('```').strip()
+                data = json.loads(api_reply)
+            except:
+                print("data解析失败",api_reply)
+                continue
 
             if '多' in data['direction'] or '涨' in data['direction']:
                 print("👉 建议做多")

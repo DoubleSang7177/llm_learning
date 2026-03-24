@@ -1,0 +1,11 @@
+{
+  "rules": [
+    {"condition": "回踩支撑位", "action": "做多"},
+    {"condition": "跌破支撑位", "action": "止损或看空"},
+    {"condition": "接近压力位", "action": "不追多"},
+    {"condition": "放量突破压力位", "action": "可以追多"},
+    {"condition": "下跌且资金费率极负", "action": "不做空，等待资金费率修复"},
+    {"condition": "跌破上涨趋势线并回踩受阻", "action": "做空"},
+    {"condition": "回撤到斐波那契0.618并与关键位共振", "action": "顺趋势做单"}
+  ]
+}

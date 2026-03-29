@@ -18,7 +18,10 @@ history_data = [
 
 model = ChatTongyi(model="qwen3-max")
 
+# 要求每一个组件都是Runnable接口的子类
 chain = chat_prompt_template | model
 
-res = chain.invoke({"history": history_data})
-print(res.content)
+res = chain.stream({"history": history_data})
+
+for chunk in res:
+    print(chunk.content , end =" ",flush=True)

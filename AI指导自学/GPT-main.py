@@ -27,7 +27,7 @@ RANGE_STRATEGY = """
 
 # ===== 加载规则 =====
 def load_rules():
-    with open('rules.json','r',encoding='utf-8') as f:
+    with open('rules.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
 
     rules_text = ''
